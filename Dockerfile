@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
@@ -13,7 +13,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgles2 \
     libglx0 \
     libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
+    libglvnd0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && ldconfig \
+    && if [ ! -f /usr/lib/x86_64-linux-gnu/libGLESv2.so.2 ]; then \
+       find / -name "libGLESv2*" 2>/dev/null; \
+       ln -sf /usr/lib/x86_64-linux-gnu/libGLESv2.so /usr/lib/x86_64-linux-gnu/libGLESv2.so.2 2>/dev/null || true; \
+       ldconfig; \
+    fi
 
 WORKDIR /app
 
