@@ -29,6 +29,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Seed copies for Docker volume (uploaded_images mount hides bundled files)
+RUN mkdir -p /app/ocr_seed && \
+    cp /app/uploaded_images/20250213_032806_25143ccc.jpg /app/ocr_seed/ && \
+    cp /app/uploaded_images/20250213_141405_e502f390.jpg /app/ocr_seed/ && \
+    cp /app/uploaded_images/20250213_151912_2bfbd617.jpeg /app/ocr_seed/
+
+COPY deploy/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 EXPOSE 10000
 
-CMD ["sh", "-c", "exec gunicorn app:app --bind 0.0.0.0:${PORT:-10000} --timeout 300 --workers 1 --threads 4"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

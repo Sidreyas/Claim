@@ -1,0 +1,31 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: claim-api
+    restart: unless-stopped
+    environment:
+      PORT: "10000"
+      CORS_ORIGINS: "*"
+    env_file:
+      - .env
+    volumes:
+      # Persist uploaded discharge notes across container restarts
+      - claim-uploads:/app/uploaded_images
+    expose:
+      - "10000"
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.frontend
+    container_name: claim-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
+volumes:
+  claim-uploads:
