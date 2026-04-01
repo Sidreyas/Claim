@@ -69,13 +69,22 @@ model = genai.GenerativeModel(
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-files = [
-    upload_to_gemini(os.path.join(BASE_DIR, "uploaded_images", "20250213_032806_25143ccc.jpg")),
-    upload_to_gemini(os.path.join(BASE_DIR, "uploaded_images", "20250213_141405_e502f390.jpg")),
-    upload_to_gemini(os.path.join(BASE_DIR, "uploaded_images", "20250213_151912_2bfbd617.jpeg")),
-]
+_ocr_session = None
 
-ocr_session = model.start_chat(
+def _get_ocr_session():
+    """Lazy-initialize the OCR few-shot session on first use."""
+    global _ocr_session
+    if _ocr_session is not None:
+        return _ocr_session
+
+    print("[OCR] Initializing few-shot session (uploading sample images to Gemini)...")
+    files = [
+        upload_to_gemini(os.path.join(BASE_DIR, "uploaded_images", "20250213_032806_25143ccc.jpg")),
+        upload_to_gemini(os.path.join(BASE_DIR, "uploaded_images", "20250213_141405_e502f390.jpg")),
+        upload_to_gemini(os.path.join(BASE_DIR, "uploaded_images", "20250213_151912_2bfbd617.jpeg")),
+    ]
+
+    _ocr_session = model.start_chat(
     history=[
         {
             "role": "user",
@@ -150,8 +159,9 @@ ocr_session = model.start_chat(
         ],
         }
     ]
-)
-
+    )
+    print("[OCR] Few-shot session ready.")
+    return _ocr_session
 
 
 def get_file_extension(content_type):
@@ -836,6 +846,10 @@ def get_image(filename):
             'message': f'Error retrieving image: {str(e)}'
         }), 404
 
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'ok'})
 
 # Add endpoint to get image upload URL for frontend
 @app.route('/get_upload_url', methods=['GET'])

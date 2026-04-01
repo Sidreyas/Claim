@@ -5,7 +5,8 @@
   },
   "deploy": {
     "startCommand": "gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300 --workers 1 --threads 4",
-    "healthcheckPath": "/get_claims",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE"
   }
 }
