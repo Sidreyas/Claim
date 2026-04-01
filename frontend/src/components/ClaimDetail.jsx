@@ -49,6 +49,56 @@ function getImageUrl(imagePath) {
   return `/api/get_image/${filename}`;
 }
 
+function basenameFromImagePath(imagePath) {
+  if (!imagePath) return '';
+  return imagePath.replace(/^uploaded_images[\\/]/, '');
+}
+
+/** Shows document image or a clear message when /get_image returns 404 (file not on server). */
+function ClaimDocumentImage({ imagePath, alt }) {
+  const [loadError, setLoadError] = useState(false);
+  const url = getImageUrl(imagePath);
+  const filename = basenameFromImagePath(imagePath);
+
+  if (!imagePath || !url) {
+    return <Text type="secondary">No image available</Text>;
+  }
+
+  if (loadError) {
+    return (
+      <Alert
+        type="warning"
+        showIcon
+        message="Image file not on this server"
+        description={
+          <>
+            <Text>
+              FAISS points to <Text code>{filename}</Text>, but that file is not in{' '}
+              <Text code>uploaded_images</Text> on this machine (e.g. it existed only on your dev PC).
+            </Text>
+            <Paragraph style={{ marginTop: 8, marginBottom: 0 }} type="secondary">
+              Fix: copy the file into the API container volume, then refresh. Example:{' '}
+              <Text code copyable>
+                {`docker cp ./${filename} claim-api:/app/uploaded_images/`}
+              </Text>
+            </Paragraph>
+          </>
+        }
+      />
+    );
+  }
+
+  return (
+    <Image
+      src={url}
+      alt={alt}
+      style={{ maxHeight: 300, objectFit: 'contain' }}
+      onError={() => setLoadError(true)}
+      fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMIAAADDCAYAAADQvc6UAAABRWlDQ1BJQ0MgUHJvZmlsZQAAKJFjYGASSSwoyGFhYGDIzSspCnJ3UoiIjFJgf8LAwSDCIMogwMCcmFxc4BgQ4ANUwgCjUcG3awyMIPqyLsis7PPOq3QdDFcvjV3jOD1boQVTPQrgSkktTgbSf4A4LbmgqISBgTEFyFYuLykAsTuAbJEioKOA7DkgdjqEvQHEToKwj4DVhAQ5A9k3gGyB5IxEoBmML4BsnSQk8XQkNtReEOBxcfXxUQg1Mge0aCSFgsw+SXWzGU1mQW4Ij8VBMAlGIHAOFBITGBqYAOA9UHBobEZoBFEJEBJWLx9AIcviAoYJBYlAh7AEgJCOxFjJkGBoCRGdmYGBgd4RQSwPwNyBLJ8kIRCILkHBgIGVv8HBYSE5JTUlFYulpaWl5QUF+fn5FQWFReUFpYU="
+    />
+  );
+}
+
 function SimilarityGauge({ value, label }) {
   const pct = Math.round(value * 100);
   const color = pct >= 90 ? '#ff4d4f' : pct >= 70 ? '#faad14' : '#52c41a';
@@ -341,16 +391,7 @@ export default function ClaimDetail() {
                 title={<Text strong style={{ color: '#1677ff' }}>New Claim Document</Text>}
                 styles={{ body: { textAlign: 'center', padding: 12, minHeight: 250, display: 'flex', alignItems: 'center', justifyContent: 'center' } }}
               >
-                {claimData.Image_Path ? (
-                  <Image
-                    src={getImageUrl(claimData.Image_Path)}
-                    alt="New claim document"
-                    style={{ maxHeight: 300, objectFit: 'contain' }}
-                    fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMIAAADDCAYAAADQvc6UAAABRWlDQ1BJQ0MgUHJvZmlsZQAAKJFjYGASSSwoyGFhYGDIzSspCnJ3UoiIjFJgf8LAwSDCIMogwMCcmFxc4BgQ4ANUwgCjUcG3awyMIPqyLsis7PPOq3QdDFcvjV3jOD1boQVTPQrgSkktTgbSf4A4LbmgqISBgTEFyFYuLykAsTuAbJEioKOA7DkgdjqEvQHEToKwj4DVhAQ5A9k3gGyB5IxEoBmML4BsnSQk8XQkNtReEOBxcfXxUQg1Mge0aCSFgsw+SXWzGU1mQW4Ij8VBMAlGIHAOFBITGBqYAOA9UHBobEZoBFEJEBJWLx9AIcviAoYJBYlAh7AEgJCOxFjJkGBoCRGdmYGBgd4RQSwPwNyBLJ8kIRCILkHBgIGVv8HBYSE5JTUlFYulpaWl5QUF+fn5FQWFReUFpYU="
-                  />
-                ) : (
-                  <Text type="secondary">No image available</Text>
-                )}
+                <ClaimDocumentImage imagePath={claimData.Image_Path} alt="New claim document" />
               </Card>
             </Col>
             <Col xs={24} md={12}>
@@ -359,16 +400,7 @@ export default function ClaimDetail() {
                 title={<Text strong style={{ color: '#fa8c16' }}>Matching Record Document</Text>}
                 styles={{ body: { textAlign: 'center', padding: 12, minHeight: 250, display: 'flex', alignItems: 'center', justifyContent: 'center' } }}
               >
-                {matchRecord.Image_Path ? (
-                  <Image
-                    src={getImageUrl(matchRecord.Image_Path)}
-                    alt="Matching record document"
-                    style={{ maxHeight: 300, objectFit: 'contain' }}
-                    fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMIAAADDCAYAAADQvc6UAAABRWlDQ1BJQ0MgUHJvZmlsZQAAKJFjYGASSSwoyGFhYGDIzSspCnJ3UoiIjFJgf8LAwSDCIMogwMCcmFxc4BgQ4ANUwgCjUcG3awyMIPqyLsis7PPOq3QdDFcvjV3jOD1boQVTPQrgSkktTgbSf4A4LbmgqISBgTEFyFYuLykAsTuAbJEioKOA7DkgdjqEvQHEToKwj4DVhAQ5A9k3gGyB5IxEoBmML4BsnSQk8XQkNtReEOBxcfXxUQg1Mge0aCSFgsw+SXWzGU1mQW4Ij8VBMAlGIHAOFBITGBqYAOA9UHBobEZoBFEJEBJWLx9AIcviAoYJBYlAh7AEgJCOxFjJkGBoCRGdmYGBgd4RQSwPwNyBLJ8kIRCILkHBgIGVv8HBYSE5JTUlFYulpaWl5QUF+fn5FQWFReUFpYU="
-                  />
-                ) : (
-                  <Text type="secondary">No image available</Text>
-                )}
+                <ClaimDocumentImage imagePath={matchRecord.Image_Path} alt="Matching record document" />
               </Card>
             </Col>
           </Row>
