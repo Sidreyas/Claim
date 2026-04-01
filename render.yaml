@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: claim-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_API_VERSION
+        sync: false
+      - key: AZURE_OPENAI_API_KEY_VISION
+        sync: false
+      - key: AZURE_OPENAI_ENDPOINT_VISION
+        sync: false
