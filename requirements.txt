@@ -8,5 +8,6 @@ google-generativeai
 werkzeug
 faiss-cpu
 mediapipe
+opencv-python-headless
 python-dotenv
 gunicorn
