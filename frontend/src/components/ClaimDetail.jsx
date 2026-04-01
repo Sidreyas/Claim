@@ -29,6 +29,7 @@ import {
   ExclamationCircleOutlined,
   SafetyCertificateOutlined,
   FileSearchOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import api from '../api/client';
 
@@ -160,6 +161,7 @@ export default function ClaimDetail() {
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchClaim = async () => {
     setLoading(true);
@@ -204,6 +206,27 @@ export default function ClaimDetail() {
     setActionLoading(false);
   };
 
+  const handleDeleteClaim = () => {
+    Modal.confirm({
+      title: 'Delete this claim?',
+      content: 'This claim will be removed from the list permanently.',
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        setDeleteLoading(true);
+        try {
+          await api.delete(`/claim/${claimId}`);
+          message.success('Claim deleted');
+          navigate('/claims');
+        } catch (err) {
+          message.error(err.response?.data?.message || err.message || 'Delete failed');
+        }
+        setDeleteLoading(false);
+      },
+    });
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: 80 }}>
@@ -245,25 +268,35 @@ export default function ClaimDetail() {
             </Tag>
           </Title>
         </Space>
-        {canAct && (
-          <Space>
-            <Button
-              type="primary"
-              icon={<CheckCircleOutlined />}
-              loading={actionLoading}
-              onClick={handleApprove}
-            >
-              Approve
-            </Button>
-            <Button
-              danger
-              icon={<CloseCircleOutlined />}
-              onClick={() => setRejectModalOpen(true)}
-            >
-              Reject
-            </Button>
-          </Space>
-        )}
+        <Space>
+          {canAct && (
+            <>
+              <Button
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                loading={actionLoading}
+                onClick={handleApprove}
+              >
+                Approve
+              </Button>
+              <Button
+                danger
+                icon={<CloseCircleOutlined />}
+                onClick={() => setRejectModalOpen(true)}
+              >
+                Reject
+              </Button>
+            </>
+          )}
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            loading={deleteLoading}
+            onClick={handleDeleteClaim}
+          >
+            Delete
+          </Button>
+        </Space>
       </div>
 
       {claim.status === 'approved' && (

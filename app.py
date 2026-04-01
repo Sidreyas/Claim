@@ -755,6 +755,27 @@ def get_claim(claim_id):
 
     return jsonify(pending_claims[claim_id]['result'])
 
+@app.route('/claim/<claim_id>', methods=['DELETE'])
+def delete_claim(claim_id):
+    """Remove a single claim from the in-memory list."""
+    if claim_id not in pending_claims:
+        return jsonify({'status': 'error', 'message': 'Claim ID not found'}), 404
+    del pending_claims[claim_id]
+    return jsonify({'status': 'success', 'message': 'Claim deleted'})
+
+
+@app.route('/claims', methods=['DELETE'])
+def delete_all_claims():
+    """Remove all claims from the in-memory list."""
+    count = len(pending_claims)
+    pending_claims.clear()
+    return jsonify({
+        'status': 'success',
+        'message': f'{count} claim(s) removed',
+        'count': count,
+    })
+
+
 @app.route('/get_claims', methods=['GET'])
 def get_claims():
     """Get all claims with optional status filter"""

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Table, Tag, Typography, Row, Col, Statistic, Button, Space, Empty } from 'antd';
+import { Card, Table, Tag, Typography, Row, Col, Statistic, Button, Space, Empty, Modal, message } from 'antd';
 import {
-  FileTextOutlined,
   PlusCircleOutlined,
   ClockCircleOutlined,
   SyncOutlined,
   CheckCircleOutlined,
   UnorderedListOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import api from '../api/client';
 
@@ -46,6 +46,27 @@ export default function ClaimList() {
   useEffect(() => {
     fetchClaims();
   }, []);
+
+  const handleCleanupAll = () => {
+    Modal.confirm({
+      title: 'Clear all claims?',
+      content:
+        'This removes pending claims from the list only. It does not affect stored index data.',
+      okText: 'Clear all',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await api.delete('/claims');
+          message.success('All claims cleared');
+          await fetchClaims();
+        } catch (e) {
+          message.error(
+            e?.response?.data?.message || e?.message || 'Failed to clear claims',
+          );
+        }
+      },
+    });
+  };
 
   const statusCounts = claims.reduce((acc, c) => {
     const status = c.status || 'unknown';
@@ -201,12 +222,15 @@ export default function ClaimList() {
       </Row>
 
       <Card>
-        <Space style={{ marginBottom: 16 }}>
+        <Space style={{ marginBottom: 16 }} wrap>
           <Button type="primary" icon={<PlusCircleOutlined />} onClick={() => navigate('/claimrequestform')}>
             New Claim
           </Button>
           <Button icon={<SyncOutlined />} onClick={fetchClaims} loading={loading}>
             Refresh
+          </Button>
+          <Button danger icon={<DeleteOutlined />} onClick={handleCleanupAll} disabled={claims.length === 0}>
+            Clear all claims
           </Button>
           {activeFilter && (
             <Button onClick={() => setActiveFilter(null)}>Clear Filter</Button>
