@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     libx11-6 \
     libice6 \
+    libegl1 \
+    libgles2 \
+    libglx0 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
