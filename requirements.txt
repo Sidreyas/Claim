@@ -1,0 +1,12 @@
+flask
+flask-cors
+pandas
+numpy
+scikit-learn
+openai
+google-generativeai
+werkzeug
+faiss-cpu
+mediapipe
+python-dotenv
+gunicorn

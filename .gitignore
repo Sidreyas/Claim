@@ -1,0 +1,15 @@
+.env
+venv/
+__pycache__/
+*.pyc
+node_modules/
+frontend/dist/
+frontend/node_modules/
+.DS_Store
+*.bak
+
+# Ignore uploaded images except the 3 OCR sample images
+uploaded_images/*
+!uploaded_images/20250213_032806_25143ccc.jpg
+!uploaded_images/20250213_141405_e502f390.jpg
+!uploaded_images/20250213_151912_2bfbd617.jpeg
