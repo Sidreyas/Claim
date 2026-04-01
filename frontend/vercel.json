@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://RAILWAY_URL_PLACEHOLDER/:path*"
+      "destination": "https://claim-backend-qzsq.onrender.com/:path*"
     }
   ]
 }
