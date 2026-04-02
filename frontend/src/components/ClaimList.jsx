@@ -49,15 +49,21 @@ export default function ClaimList() {
 
   const handleCleanupAll = () => {
     Modal.confirm({
-      title: 'Clear all claims?',
+      title: 'Clear all claims and FAISS storage?',
       content:
-        'This removes pending claims from the list only. It does not affect stored index data.',
+        'This removes all pending claims and resets the fraud detection database. New claims will not be compared against old records.',
       okText: 'Clear all',
       okType: 'danger',
       onOk: async () => {
         try {
-          await api.delete('/claims');
-          message.success('All claims cleared');
+          const { data } = await api.delete('/claims');
+          if (data.text_ntotal_after_clear !== 0 || data.len_records_after_clear !== 0) {
+            message.warning(
+              `Clear finished but FAISS still reports vectors (text=${data.text_ntotal_after_clear}, records=${data.len_records_after_clear}). Restart the API and try again.`,
+            );
+          } else {
+            message.success('All claims and FAISS storage cleared');
+          }
           await fetchClaims();
         } catch (e) {
           message.error(

@@ -10,7 +10,7 @@ import os
 from werkzeug.utils import secure_filename
 import re
 from vision_compare import (init_embedders, generate_embedding, generate_image_embedding,
-                          create_or_load_indices, add_record, save_indices)
+                          create_or_load_indices, create_empty_indices, add_record, save_indices)
 from datetime import datetime
 import uuid
 import base64
@@ -213,11 +213,20 @@ openai.api_base = os.getenv('AZURE_OPENAI_ENDPOINT')
 openai.api_type = 'azure'
 openai.api_version = os.getenv('AZURE_OPENAI_API_VERSION', '2023-03-15-preview')
 
+# FAISS files always live next to app.py (not process cwd — avoids wrong folder / failed delete + reload bug)
+APP_ROOT = os.path.dirname(os.path.abspath(__file__))
+FAISS_TEXT_PATH = os.path.join(APP_ROOT, 'text_index.faiss')
+FAISS_IMAGE_PATH = os.path.join(APP_ROOT, 'image_index.faiss')
+FAISS_RECORDS_PATH = os.path.join(APP_ROOT, 'records.pkl')
+
 # Initialize image embedder globally
 image_embedder, _ = init_embedders()
 
 # Load FAISS indices
-text_index, image_index, records = create_or_load_indices()
+text_index, image_index, records = create_or_load_indices(
+    FAISS_TEXT_PATH, FAISS_IMAGE_PATH, FAISS_RECORDS_PATH,
+)
+print(f"FAISS paths: text={FAISS_TEXT_PATH} (ntotal={text_index.ntotal})")
 
 # Function to generate embedding
 def generate_embedding(text):
@@ -358,10 +367,14 @@ def convert_numpy_to_json_serializable(obj):
         return [convert_numpy_to_json_serializable(item) for item in list]
     return obj
 
-# Modify the detect_fraud function
-def detect_fraud(new_claim, k=10, text_threshold=0.85, image_threshold=0.85):  # Lowered text threshold
+# Modify the detect_fraud function (indices passed explicitly — never rely on stale globals)
+def detect_fraud(new_claim, text_index, image_index, records, k=10, text_threshold=0.85, image_threshold=0.85):
     fraud_cases = []
     print(f"\nAnalyzing new claim for IC: {new_claim['IC']}")
+
+    if text_index.ntotal == 0 or len(records) == 0:
+        print("FAISS text index is empty — no historical records to compare against.")
+        return fraud_cases
 
     # Generate text embedding for new claim
     text_input = f"""
@@ -393,6 +406,7 @@ def detect_fraud(new_claim, k=10, text_threshold=0.85, image_threshold=0.85):  #
 
         is_suspicious = False
         fraud_type = []
+        image_similarity = None
 
         # Case 1: Same patient, similar claim within 30 days
         if new_claim['IC'] == record['IC']:
@@ -442,7 +456,7 @@ def detect_fraud(new_claim, k=10, text_threshold=0.85, image_threshold=0.85):  #
             fraud_cases.append({
                 'Matched_IC': record['IC'],
                 'Text_Similarity': text_similarity,
-                'Image_Similarity': image_similarity if 'Image_Path' in new_claim else None,
+                'Image_Similarity': image_similarity,
                 'Fraud_Types': fraud_type,
                 'Analysis': gpt_analysis,
                 'Matching_Record': clean_record
@@ -584,6 +598,38 @@ def add_record(record_data, image_embedder, text_index, image_index, records):
 pending_claims = {}
 
 
+def clear_faiss_storage_and_session():
+    """Delete FAISS files under APP_ROOT, clear session state, force empty indices.
+
+    Always uses create_empty_indices() after delete — never create_or_load_indices() here,
+    or a failed delete would reload old vectors from disk.
+    """
+    deleted_files = []
+    failed_files = []
+    for path in (FAISS_TEXT_PATH, FAISS_IMAGE_PATH, FAISS_RECORDS_PATH):
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                deleted_files.append(path)
+            else:
+                failed_files.append(f"{path} (not found)")
+        except Exception as e:
+            failed_files.append(f"{path} (error: {str(e)})")
+    global results, pending_claims, text_index, image_index, records
+    results.clear()
+    pending_claims.clear()
+    text_index, image_index, records = create_empty_indices()
+    save_indices(
+        text_index, image_index, records,
+        FAISS_TEXT_PATH, FAISS_IMAGE_PATH, FAISS_RECORDS_PATH,
+    )
+    print(
+        f"FAISS cleared: ntext={text_index.ntotal}, nimage={image_index.ntotal}, "
+        f"nrecords={len(records)}"
+    )
+    return deleted_files, failed_files
+
+
 @app.route('/submit_claim', methods=['POST'])
 def submit_claim():
     print(f"\nCurrent database status before processing:")
@@ -636,7 +682,7 @@ def submit_claim():
         return jsonify(result), 400
 
     # Proceed with fraud detection if validation passed
-    fraud_cases = detect_fraud(final_claim_data)
+    fraud_cases = detect_fraud(final_claim_data, text_index, image_index, records)
 
     # Prepare the record to be added
     record_to_add = {
@@ -694,7 +740,10 @@ def approve_claim(claim_id):
         print("Successfully added record")
 
         # Save updated indices
-        save_indices(text_index, image_index, records)
+        save_indices(
+            text_index, image_index, records,
+            FAISS_TEXT_PATH, FAISS_IMAGE_PATH, FAISS_RECORDS_PATH,
+        )
         print("Successfully saved indices")
 
         # Update the claim status
@@ -764,15 +813,33 @@ def delete_claim(claim_id):
     return jsonify({'status': 'success', 'message': 'Claim deleted'})
 
 
+@app.route('/faiss_status', methods=['GET'])
+def faiss_status():
+    """Debug: current FAISS state (paths are next to app.py)."""
+    return jsonify({
+        'text_ntotal': text_index.ntotal,
+        'image_ntotal': image_index.ntotal,
+        'len_records': len(records),
+        'text_path': FAISS_TEXT_PATH,
+        'image_path': FAISS_IMAGE_PATH,
+        'records_path': FAISS_RECORDS_PATH,
+    })
+
+
 @app.route('/claims', methods=['DELETE'])
 def delete_all_claims():
-    """Remove all claims from the in-memory list."""
+    """Clear pending claims and all FAISS embedding storage (full reset)."""
     count = len(pending_claims)
-    pending_claims.clear()
+    deleted_files, failed_files = clear_faiss_storage_and_session()
     return jsonify({
         'status': 'success',
-        'message': f'{count} claim(s) removed',
+        'message': f'Removed {count} claim(s) and cleared FAISS indices',
         'count': count,
+        'deleted_files': deleted_files,
+        'failed_files': failed_files,
+        'faiss_cleared': True,
+        'text_ntotal_after_clear': text_index.ntotal,
+        'len_records_after_clear': len(records),
     })
 
 
@@ -947,25 +1014,7 @@ def do_ocr_url():
 @app.route('/reset_app', methods=['GET'])
 def reset_app():
     """Reset the app by deleting index and records files and clearing in-memory data."""
-    import glob
-    deleted_files = []
-    failed_files = []
-    files_to_delete = ['text_index.faiss', 'image_index.faiss', 'records.pkl']
-    for fname in files_to_delete:
-        try:
-            if os.path.exists(fname):
-                os.remove(fname)
-                deleted_files.append(fname)
-            else:
-                failed_files.append(f"{fname} (not found)")
-        except Exception as e:
-            failed_files.append(f"{fname} (error: {str(e)})")
-    # Clear in-memory data
-    global results, pending_claims, text_index, image_index, records
-    results.clear()
-    pending_claims.clear()
-    # Reload empty indices and records
-    text_index, image_index, records = create_or_load_indices()
+    deleted_files, failed_files = clear_faiss_storage_and_session()
     return jsonify({
         'status': 'success',
         'deleted_files': deleted_files,

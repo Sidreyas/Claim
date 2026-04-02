@@ -91,6 +91,16 @@ def create_or_load_indices(text_index_path='text_index.faiss',
 
     return text_index, image_index, records
 
+
+def create_empty_indices():
+    """Fresh empty FAISS indices and records list (same dimensions as create_or_load_indices)."""
+    text_dimension = 1536
+    image_dimension = 1024
+    text_index = faiss.IndexFlatL2(text_dimension)
+    image_index = faiss.IndexFlatL2(image_dimension)
+    return text_index, image_index, []
+
+
 def add_record(record_data, image_embedder, text_index, image_index, records):
     """Add a new record with both text and image embeddings"""
     try:

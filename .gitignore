@@ -8,6 +8,10 @@ frontend/node_modules/
 .DS_Store
 *.bak
 
+# Embedding store (never commit — would re-seed Docker images with old vectors)
+*.faiss
+records.pkl
+
 # Ignore uploaded images except the 3 OCR sample images
 uploaded_images/*
 !uploaded_images/20250213_032806_25143ccc.jpg
